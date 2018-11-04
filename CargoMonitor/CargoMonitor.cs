@@ -1003,7 +1003,10 @@ namespace EddiCargoMonitor
                 {
                     Mission mission = ((MissionMonitor)EDDI.Instance.ObtainMonitor("Mission monitor"))
                         .GetMissionWithMissionId(info.missionid ?? 0);
-                    cargoHaulage = new Haulage(info.missionid ?? 0, "Unknown", mission?.originsystem, mission?.amount ?? info.count, null);
+                    string name = mission?.name ?? "Unknown";
+                    int amount = mission?.amount ?? info.count;
+
+                    cargoHaulage = new Haulage(info.missionid ?? 0, name, mission?.originsystem, amount, null);
                     cargo.haulageData.Add(cargoHaulage);
                     cargo.CalculateNeed();
                     update = true;
