@@ -382,8 +382,9 @@ namespace EddiJournalMonitor
                                 {
                                     Logging.Error("Failed to map cargo type " + commodityName + " to commodity definition", line);
                                 }
+                                long? missionid = JsonParsing.getOptionalLong(data, "MissionID");
                                 bool stolen = JsonParsing.getBool(data, "Stolen");
-                                events.Add(new CommodityCollectedEvent(timestamp, commodity, stolen) { raw = line });
+                                events.Add(new CommodityCollectedEvent(timestamp, commodity, missionid, stolen) { raw = line });
                                 handled = true;
                             }
                             handled = true;
@@ -396,10 +397,11 @@ namespace EddiJournalMonitor
                                 {
                                     Logging.Error("Failed to map cargo type " + commodityName + " to commodity definition", line);
                                 }
+                                long? missionid = JsonParsing.getOptionalLong(data, "MissionID");
                                 data.TryGetValue("Count", out object val);
                                 int amount = (int)(long)val;
                                 bool abandoned = JsonParsing.getBool(data, "Abandoned");
-                                events.Add(new CommodityEjectedEvent(timestamp, commodity, amount, abandoned) { raw = line });
+                                events.Add(new CommodityEjectedEvent(timestamp, commodity, amount, missionid, abandoned) { raw = line });
                             }
                             handled = true;
                             break;
@@ -1384,13 +1386,6 @@ namespace EddiJournalMonitor
                                 string channel = JsonParsing.getString(data, "Channel");
                                 string message = JsonParsing.getString(data, "Message");
                                 string source = "";
-
-                                if (from == string.Empty && channel == "npc" && message.StartsWith("Entered Channel: "))
-                                {
-                                    // We can safely ignore messages that simply announce that we entered a channel - no event is needed. 
-                                    handled = true;
-                                    break;
-                                }
 
                                 if (
                                     channel == "player" ||
@@ -2622,7 +2617,7 @@ namespace EddiJournalMonitor
                                 {
                                     item = EddiDataDefinitions.Properties.Modules.ShipIntegrity;
                                 }
-                                else if (item != "All" && item != "Paint")
+                                else if (item != "All")
                                 {
                                     // Item might be a module
                                     Module module = Module.FromEDName(item);
@@ -2764,9 +2759,9 @@ namespace EddiJournalMonitor
                             break;
                         case "Cargo":
                             {
-                                int cargocarried = 0;
-                                List<Cargo> inventory = new List<Cargo>();
+                                List<CargoInfo> inventory = new List<CargoInfo>();
 
+                                int cargocarried = JsonParsing.getInt(data, "Count");
                                 data.TryGetValue("Inventory", out object val);
                                 if (val != null)
                                 {
@@ -2774,19 +2769,18 @@ namespace EddiJournalMonitor
                                     foreach (Dictionary<string, object> cargoJson in inventoryJson)
                                     {
                                         string name = JsonParsing.getString(cargoJson, "Name");
-                                        int amount = JsonParsing.getInt(cargoJson, "Count");
-                                        cargocarried += amount;
-                                        Cargo cargo = new Cargo(name, amount)
-                                        {
-                                            haulage = 0,
-                                            stolen = JsonParsing.getInt(cargoJson, "Stolen")
-                                        };
-                                        cargo.owned = amount - cargo.stolen;
-                                        inventory.Add(cargo);
+                                        long? missionid = JsonParsing.getOptionalLong(cargoJson, "MissionID");
+                                        int count = JsonParsing.getInt(cargoJson, "Count");
+                                        int stolen = JsonParsing.getInt(cargoJson, "Stolen");
+                                        CargoInfo info = new CargoInfo(name, missionid, count, stolen);
+                                        inventory.Add(info);
                                     }
+                                    events.Add(new CargoInventoryEvent(timestamp, inventory, cargocarried) { raw = line });
                                 }
-
-                                events.Add(new CargoInventoryEvent(DateTime.UtcNow, inventory, cargocarried) { raw = line });
+                                else
+                                {
+                                    events.Add(new CargoUpdatedEvent(timestamp, cargocarried) { raw = line });
+                                }
                             }
                             handled = true;
                             break;

@@ -102,9 +102,6 @@ namespace EddiDataDefinitions
         // Total amount of the commodity
         public int total { get; set; }
 
-        // How much cargo has been ejected during a game session
-        public int ejected { get; set; }
-
         // How much we actually paid for it (per unit)
         public int price { get; set; }
 
@@ -131,7 +128,7 @@ namespace EddiDataDefinitions
             }
         }
 
-        [Obsolete, JsonIgnore]
+        [JsonIgnore, Obsolete]
         public CommodityDefinition commodity => commodityDef;
 
         public List<Haulage> haulageData { get; set; }
@@ -145,7 +142,7 @@ namespace EddiDataDefinitions
             if (commodityDef == null)
             {
                 // legacy JSON with no edname in the top level
-                string edname = (string)_additionalJsonData["commodity"]["EDName"];
+                string edname = (string)_additionalJsonData["commodity"]["edname"];
                 commodityDef = CommodityDefinition.FromEDName(edname);
                 owned = (int)_additionalJsonData["other"];
             }
