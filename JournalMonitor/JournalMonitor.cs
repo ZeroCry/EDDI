@@ -2775,12 +2775,12 @@ namespace EddiJournalMonitor
                                         CargoInfo info = new CargoInfo(name, missionid, count, stolen);
                                         inventory.Add(info);
                                     }
-                                    events.Add(new CargoInventoryEvent(timestamp, inventory, cargocarried) { raw = line });
                                 }
                                 else
                                 {
-                                    events.Add(new CargoUpdatedEvent(timestamp, cargocarried) { raw = line });
+                                    inventory = CargoInfoReader.FromFile().Inventory;
                                 }
+                                events.Add(new CargoEvent(timestamp, inventory, cargocarried) { raw = line });
                             }
                             handled = true;
                             break;

@@ -146,13 +146,9 @@ namespace EddiCargoMonitor
             Logging.Debug("Received event " + JsonConvert.SerializeObject(@event));
 
             // Handle the events that we care about
-            if (@event is CargoInventoryEvent)
+            if (@event is CargoEvent)
             {
-                handleCargoInventoryEvent((CargoInventoryEvent)@event);
-            }
-            else if (@event is CargoUpdatedEvent)
-            {
-                handleCargoUpdatedEvent((CargoUpdatedEvent)@event);
+                handleCargoEvent((CargoEvent)@event);
             }
             else if (@event is CommodityCollectedEvent)
             {
@@ -210,15 +206,15 @@ namespace EddiCargoMonitor
             }
         }
 
-        private void handleCargoInventoryEvent(CargoInventoryEvent @event)
+        private void handleCargoEvent(CargoEvent @event)
         {
-            if(_handleCargoInventoryEvent(@event))
+            if(_handleCargoEvent(@event))
             {
                 writeInventory();
             }
         }
 
-        private bool _handleCargoInventoryEvent(CargoInventoryEvent @event)
+        private bool _handleCargoEvent(CargoEvent @event)
         {
             bool update = false;
             cargoCarried = @event.cargocarried;
@@ -266,81 +262,6 @@ namespace EddiCargoMonitor
                         cargo = new Cargo(info.name, 0);
                         update = UpdateCargoFromInfo(cargo, infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList());
                         AddCargo(cargo);
-                    }
-                    infoList.RemoveAll(i => i.name == cargo.edname.ToLowerInvariant());
-                }
-            }
-            return update;
-        }
-
-        private void handleCargoUpdatedEvent(CargoUpdatedEvent @event)
-        {
-            if (_handleCargoUpdatedEvent(@event))
-            {
-                writeInventory();
-            }
-        }
-
-        private bool _handleCargoUpdatedEvent(CargoUpdatedEvent @event)
-        {
-            bool update = false;
-            if (@event.cargocarried == cargoCarried)
-            {
-                return update;
-            }
-            cargoCarried = @event.cargocarried;
-
-            List<CargoInfo> infoList = CargoInfoReader.FromFile().Inventory;
-            if (infoList != null)
-            {
-                // Remove strays from the manifest
-                foreach (Cargo inventoryCargo in inventory.ToList())
-                {
-                    CargoInfo info = infoList.FirstOrDefault(i => i.name == inventoryCargo.edname.ToLowerInvariant());
-                    if (info == null)
-                    {
-                        update = true;
-                        if (inventoryCargo.haulageData == null || !inventoryCargo.haulageData.Any())
-                        {
-                            // Strip out the stray from the manifest
-                            _RemoveCargoWithEDName(inventoryCargo.edname);
-                        }
-                        else
-                        {
-                            // Keep cargo entry in manifest with zeroed amounts, if missions are pending
-                            inventoryCargo.total = 0;
-                            inventoryCargo.haulage = 0;
-                            inventoryCargo.owned = 0;
-                            inventoryCargo.stolen = 0;
-                            inventoryCargo.CalculateNeed();
-                        }
-                        return update;
-                    }
-                }
-
-                // Update the cargo from the event. Add if new.
-                while (infoList.Count() > 0)
-                {
-                    CargoInfo info = infoList.First();
-                    Cargo cargo = inventory.FirstOrDefault(c => c.edname.ToLowerInvariant() == info.name);
-                    if (cargo != null)
-                    {
-                        List<CargoInfo> CargoInfo = infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList();
-                        int total = CargoInfo.Sum(i => i.count);
-                        if (total != cargo.total)
-                        {
-                            update = UpdateCargoFromInfo(cargo, CargoInfo);
-                            return update;
-                        }
-                    }
-
-                    // Cargo is new
-                    else
-                    {
-                        cargo = new Cargo(info.name, 0);
-                        update = UpdateCargoFromInfo(cargo, infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList());
-                        AddCargo(cargo);
-                        return update;
                     }
                     infoList.RemoveAll(i => i.name == cargo.edname.ToLowerInvariant());
                 }
@@ -573,6 +494,7 @@ namespace EddiCargoMonitor
                                 haulage = new Haulage(@event.missionid ?? 0, name, originSystem, amountRemaining, null);
                                 cargo.haulageData.Add(haulage);
                             }
+                            cargo.CalculateNeed();
                         }
                         else
                         {
@@ -587,6 +509,7 @@ namespace EddiCargoMonitor
                             string name = mission?.name ?? (@event.startmarketid == 0 ? "MISSION_CollectWing" : "MISSION_DeliveryWing");
                             haulage = new Haulage(@event.missionid ?? 0, name, originSystem, amountRemaining, null, true);
                             cargo.haulageData.Add(haulage);
+                            cargo.CalculateNeed();
                         }
                         haulage.collected = @event.collected;
                         haulage.delivered = @event.delivered;
@@ -625,6 +548,7 @@ namespace EddiCargoMonitor
                             haulage = new Haulage(@event.missionid ?? 0, name, null, amountRemaining, null, true);
                             cargo.haulageData.Add(haulage);
                         }
+                        cargo.CalculateNeed();
 
                         int amount = Math.Max(@event.collected - haulage.collected, @event.delivered - haulage.delivered);
                         if (amount > 0)
@@ -1005,8 +929,9 @@ namespace EddiCargoMonitor
                         .GetMissionWithMissionId(info.missionid ?? 0);
                     string name = mission?.name ?? "Unknown";
                     int amount = mission?.amount ?? info.count;
+                    DateTime? expiry = mission?.expiry;
 
-                    cargoHaulage = new Haulage(info.missionid ?? 0, name, mission?.originsystem, amount, null);
+                    cargoHaulage = new Haulage(info.missionid ?? 0, name, mission?.originsystem, amount, expiry);
                     cargo.haulageData.Add(cargoHaulage);
                     cargo.CalculateNeed();
                     update = true;

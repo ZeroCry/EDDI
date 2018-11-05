@@ -118,167 +118,51 @@ namespace UnitTests
         [TestMethod]
         public void TestCargoEventsScenario()
         {
-            cargoMonitor.initializeCargoMonitor(new CargoMonitorConfiguration());
             var privateObject = new PrivateObject(cargoMonitor);
+            Haulage haulage = new Haulage();
 
             // CargoEvent
-            line = @"{""timestamp"": ""2018-05-05T19:12:10Z"", ""event"": ""Cargo"", ""Inventory"": [ { ""Name"": ""damagedescapepod"", ""Name_Localised"": ""Damaged Escape Pod"", ""Count"": 4, ""Stolen"": 0 }, { ""Name"": ""usscargoblackbox"", ""Name_Localised"": ""Black Box"", ""Count"": 4, ""Stolen"": 4 }, { ""Name"": ""drones"", ""Name_Localised"": ""Limpet"", ""Count"": 21, ""Stolen"": 0 } ] }";
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 } ] }";
             events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCargoInventoryEvent", new object[] { events[0] });
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
             Assert.AreEqual(3, cargoMonitor.inventory.Count);
+            Assert.AreEqual(32, cargoMonitor.cargoCarried);
 
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual("Limpet", cargo.invariantName);
-            Assert.AreEqual(21, cargo.total);
-            Assert.AreEqual(21, cargo.owned);
+            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "hydrogenfuel");
+            Assert.AreEqual("Hydrogen Fuel", cargo.localizedName);
+            Assert.AreEqual(1, cargo.total);
+            Assert.AreEqual(1, cargo.owned);
             Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
 
-            // CargoCollectedEvent
-            line = @"{""timestamp"":""2016-06-10T14:32:03Z"",""event"":""CollectCargo"",""Type"":""agriculturalmedicines"",""Stolen"":true}";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommodityCollectedEvent", new object[] { events[0] });
-            Assert.AreEqual(4, cargoMonitor.inventory.Count);
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "AgriculturalMedicines");
-            Assert.AreEqual("Agri-Medicines", cargo.invariantName);
-            Assert.AreEqual(1, cargo.total);
-            Assert.AreEqual(1, cargo.stolen);
-            Assert.AreEqual(0, cargo.owned + cargo.need + cargo.haulage);
+            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "biowaste");
+            Assert.AreEqual(30, cargo.total);
+            Assert.AreEqual(30, cargo.haulage);
+            haulage = cargo.haulageData.First();
+            Assert.AreEqual(426282789, haulage.missionid);
+            Assert.AreEqual("Unknown", haulage.name);
+            Assert.AreEqual(30, haulage.amount);
+            Assert.AreEqual("Active", haulage.status);
 
             // CargoEjectedEvent
-            line = @"{""timestamp"": ""2016-06-10T14:32:03Z"", ""event"": ""EjectCargo"", ""Type"":""drones"", ""Count"":2, ""Abandoned"":true}";
+            line = @"{""timestamp"": ""2016-06-10T14:32:03Z"", ""event"": ""EjectCargo"", ""Type"":""biowaste"", ""Count"":2, ""MissionID"":4262827892, ""Abandoned"":true}";
             events = JournalMonitor.ParseJournalEntry(line);
             privateObject.Invoke("_handleCommodityEjectedEvent", new object[] { events[0] });
 
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual(19, cargo.total);
-            Assert.AreEqual(19, cargo.owned);
-            Assert.AreEqual(0, cargo.need);
-            Assert.AreEqual(0, cargo.stolen);
-            Assert.AreEqual(0, cargo.haulage);
-
-            // CargoPurchasedEvent
-            line = @"{ ""timestamp"":""2018-04-07T16:29:39Z"", ""event"":""MarketBuy"", ""MarketID"":3224801280, ""Type"":""coffee"", ""Count"":1, ""BuyPrice"":1198, ""TotalCost"":1198 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommodityPurchasedEvent", new object[] { events[0] });
-
-            Assert.AreEqual(5, cargoMonitor.inventory.Count);
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Coffee");
-            Assert.AreEqual("Coffee", cargo.invariantName);
-            Assert.AreEqual(1, cargo.total);
-            Assert.AreEqual(1, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-
-            // CargoRefinedEvent
-            line = @"{ ""timestamp"":""2016-09-30T18:00:22Z"", ""event"":""MiningRefined"", ""Type"":""$hydrogenperoxide_name;"", ""Type_Localised"":""Hydrogen Peroxide"" }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommodityRefinedEvent", new object[] { events[0] });
-
-            Assert.AreEqual(6, cargoMonitor.inventory.Count);
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "HydrogenPeroxide");
-            Assert.AreEqual("Hydrogen Peroxide", cargo.invariantName);
-            Assert.AreEqual(1, cargo.total);
-            Assert.AreEqual(1, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-
-            // CargoSoldEvent
-            line = @"{ ""timestamp"":""2018-04-07T16:29:44Z"", ""event"":""MarketSell"", ""MarketID"":3224801280, ""Type"":""coffee"", ""Count"":1, ""SellPrice"":1138, ""TotalSale"":1138, ""AvgPricePaid"":1198 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommoditySoldEvent", new object[] { events[0] });
-
-            Assert.AreEqual(5, cargoMonitor.inventory.Count);
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Coffee");
-            Assert.IsNull(cargo);
-
-            // CargoPowerCommodityObtainedEvent
-            line = @"{ ""timestamp"":""2016-12-02T16:10:26Z"", ""event"":""PowerplayCollect"", ""Power"":""Aisling Duval"", ""Type"":""$aislingmediamaterials_name;"", ""Type_Localised"":""Aisling Media Materials"", ""Count"":3 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handlePowerCommodityObtainedEvent", new object[] { events[0] });
-
-            Assert.AreEqual(6, cargoMonitor.inventory.Count);
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname.ToLowerInvariant() == "aislingmediamaterials");
-            Assert.AreEqual("Aisling Media Materials", cargo.invariantName);
-            Assert.AreEqual(3, cargo.total);
-            Assert.AreEqual(3, cargo.owned);
-            Assert.AreEqual(0, cargo.need);
-            Assert.AreEqual(0, cargo.stolen);
-            Assert.AreEqual(0, cargo.haulage);
-
-            // CargoPowerCommodityDeliveredEvent
-            line = @"{ ""timestamp"":""2016-12-02T16:10:26Z"", ""event"":""PowerplayDeliver"", ""Power"":""Aisling Duval"", ""Type"":""$aislingmediamaterials_name;"", ""Type_Localised"":""Aisling Media Materials"", ""Count"":3 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handlePowerCommodityDeliveredEvent", new object[] { events[0] });
-
-            Assert.AreEqual(5, cargoMonitor.inventory.Count);
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname.ToLowerInvariant() == "aislingmediamaterials");
-            Assert.IsNull(cargo);
-        }
-
-        [TestMethod]
-        public void TestCargoLimpetScenario()
-        {
-            cargoMonitor.initializeCargoMonitor(new CargoMonitorConfiguration());
-            var privateObject = new PrivateObject(cargoMonitor);
-
-            line = @"{""timestamp"": ""2018-05-05T19:12:10Z"", ""event"": ""Cargo"", ""Inventory"": [ { ""Name"": ""damagedescapepod"", ""Name_Localised"": ""Damaged Escape Pod"", ""Count"": 4, ""Stolen"": 0 }, { ""Name"": ""usscargoblackbox"", ""Name_Localised"": ""Black Box"", ""Count"": 4, ""Stolen"": 4 }, { ""Name"": ""drones"", ""Name_Localised"": ""Limpet"", ""Count"": 21, ""Stolen"": 0 } ] }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCargoInventoryEvent", new object[] { events[0] });
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual("Limpet", cargo.invariantName);
-            Assert.AreEqual(21, cargo.total);
-            Assert.AreEqual(21, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-
-            // CargoLimpetPurchasedEvent
-            line = @"{ ""timestamp"":""2016-09-21T06:53:53Z"", ""event"":""BuyDrones"", ""Type"":""Drones"", ""Count"":19, ""BuyPrice"":101, ""TotalCost"":1919 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleLimpetPurchasedEvent", new object[] { events[0] });
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual("Limpet", cargo.invariantName);
-            Assert.AreEqual(40, cargo.total);
-            Assert.AreEqual(40, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-
-            // CargoLimpetSoldEvent
-            line = @"{ ""timestamp"":""2016-09-24T00:03:25Z"", ""event"":""SellDrones"", ""Type"":""Drones"", ""Count"":8, ""SellPrice"":101, ""TotalSale"":808 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleLimpetSoldEvent", new object[] { events[0] });
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual("Limpet", cargo.invariantName);
-            Assert.AreEqual(32, cargo.total);
-            Assert.AreEqual(32, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-
-            // CargoLimpetLaunchedEvent
-            line = @"{ ""timestamp"":""2018-04-07T20:05:07Z"", ""event"":""LaunchDrone"", ""Type"":""Collection"" }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleLimpetLaunchedEvent", new object[] {});
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual("Limpet", cargo.invariantName);
-            Assert.AreEqual(31, cargo.total);
-            Assert.AreEqual(31, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
+            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "biowaste");
+            haulage = cargo.haulageData.FirstOrDefault(h => h.missionid == 426282789);
+            Assert.AreEqual("Failed", haulage.status);
         }
 
         [TestMethod]
         public void TestCargoMissionScenario()
         {
-            cargoMonitor.initializeCargoMonitor(new CargoMonitorConfiguration());
             var privateObject = new PrivateObject(cargoMonitor);
+            Haulage haulage = new Haulage();
 
-            line = @"{""timestamp"": ""2018-05-05T19:12:10Z"", ""event"": ""Cargo"", ""Inventory"": [ { ""Name"": ""damagedescapepod"", ""Name_Localised"": ""Damaged Escape Pod"", ""Count"": 4, ""Stolen"": 0 }, { ""Name"": ""usscargoblackbox"", ""Name_Localised"": ""Black Box"", ""Count"": 4, ""Stolen"": 4 }, { ""Name"": ""drones"", ""Name_Localised"": ""Limpet"", ""Count"": 21, ""Stolen"": 0 } ] }";
+            // CargoEvent
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 } ] }";
             events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCargoInventoryEvent", new object[] { events[0] });
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "Drones");
-            Assert.AreEqual("Limpet", cargo.invariantName);
-            Assert.AreEqual(21, cargo.total);
-            Assert.AreEqual(21, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
 
             // CargoMissionAcceptedEvent - Check to see if this is a cargo mission and update our inventory accordingly
             line = @"{ ""timestamp"": ""2018-05-05T19:42:20Z"", ""event"": ""MissionAccepted"", ""Faction"": ""Elite Knights"", ""Name"": ""Mission_Salvage_Planet"", ""LocalisedName"": ""Salvage 3 Structural Regulators"", ""Commodity"": ""$StructuralRegulators_Name;"", ""Commodity_Localised"": ""Structural Regulators"", ""Count"": 3, ""DestinationSystem"": ""Merope"", ""Expiry"": ""2018-05-12T15:20:27Z"", ""Wing"": false, ""Influence"": ""Med"", ""Reputation"": ""Med"", ""Reward"": 557296, ""MissionID"": 375682327 }";
@@ -293,31 +177,32 @@ namespace UnitTests
             Assert.AreEqual(0, cargo.total);
             Assert.AreEqual(7, cargo.need);
 
-            Haulage haulage = cargo.haulageData.FirstOrDefault(h => h.missionid == 375682327);
+            haulage = cargo.haulageData.FirstOrDefault(h => h.missionid == 375682327);
             Assert.AreEqual(0, cargo.haulage + cargo.stolen + cargo.owned);
             Assert.AreEqual(3, haulage.amount);
             Assert.AreEqual("Mission_Salvage_Planet", haulage.name);
             Assert.AreEqual(DateTime.Parse("2018-05-12T15:20:27Z").ToUniversalTime(), haulage.expiry);
 
-            // CargoCollectedEvent
-            line = @"{""timestamp"":""2018-05-05T19:42:20Z"",""event"":""CollectCargo"",""Type"":""$StructuralRegulators_Name;"",""Stolen"":false}";
+            // CargoEvent - Collected 2 Structural Regulators for mission ID 375682327
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"structuralregulators\", \"MissionID\":375682327, \"Count\":2, \"Stolen\":0 } ] }";
             events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommodityCollectedEvent", new object[] { events[0] });
-            line = @"{""timestamp"":""2018-05-05T19:42:20Z"",""event"":""CollectCargo"",""Type"":""$StructuralRegulators_Name;"",""Stolen"":false}";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommodityCollectedEvent", new object[] { events[0] });
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
 
             cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "StructuralRegulators");
             Assert.AreEqual(2, cargo.total);
             Assert.AreEqual(2, cargo.haulage);
             Assert.AreEqual(5, cargo.need);
             Assert.AreEqual(0, cargo.stolen + cargo.owned);
-            Assert.AreEqual(3, haulage.amount);
 
-            // CargoMissionAbandonedEvent - If we abandon a mission with cargo it becomes stolen
+            // Cargo MissionAbandonedEvent - If we abandon a mission with cargo it becomes stolen
             line = @"{ ""timestamp"":""2018-05-05T19:42:20Z"", ""event"":""MissionAbandoned"", ""Name"":""Mission_Salvage_Planet"", ""MissionID"":375682327 }";
             events = JournalMonitor.ParseJournalEntry(line);
             privateObject.Invoke("_handleMissionAbandonedEvent", new object[] { events[0] });
+
+            // CargoEvent - 2 Structural Regulators now 'stolen'
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"structuralregulators\", \"Count\":2, \"Stolen\":2 } ] }";
+            events = JournalMonitor.ParseJournalEntry(line);
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
 
             cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "StructuralRegulators");
             Assert.AreEqual(2, cargo.total);
@@ -325,10 +210,20 @@ namespace UnitTests
             Assert.AreEqual(4, cargo.need);
             Assert.AreEqual(0, cargo.haulage + cargo.owned);
 
+            // CargoEvent - Collected 4 Structural Regulators for mission ID 37566072
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"structuralregulators\", \"MissionID\":37566072, \"Count\":4, \"Stolen\":0 } ] }";
+            events = JournalMonitor.ParseJournalEntry(line);
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
+
             // CargoMissionCompletedEvent - Check to see if this is a cargo mission and update our inventory accordingly
             line = @"{ ""timestamp"": ""2018-05-05T22:27:58Z"", ""event"": ""MissionCompleted"", ""Faction"": ""Merope Expeditionary Fleet"", ""Name"": ""Mission_Salvage_Planet_name"", ""MissionID"": 375660729, ""Commodity"": ""$StructuralRegulators_Name;"", ""Commodity_Localised"": ""Structural Regulators"", ""Count"": 4, ""DestinationSystem"": ""HIP 17692"", ""Reward"": 624016, ""FactionEffects"": [ { ""Faction"": ""Merope Expeditionary Fleet"", ""Effects"": [ { ""Effect"": ""$MISSIONUTIL_Interaction_Summary_civilUnrest_down;"", ""Effect_Localised"": ""$#MinorFaction; are happy to report improved civil contentment, making a period of civil unrest unlikely."", ""Trend"": ""DownGood"" } ], ""Influence"": [ { ""SystemAddress"": 224644818084, ""Trend"": ""UpGood"" } ], ""Reputation"": ""UpGood"" } ] }";
             events = JournalMonitor.ParseJournalEntry(line);
             privateObject.Invoke("_handleMissionCompletedEvent", new object[] { events[0] });
+
+            // CargoEvent - 4 Structural Regulators delivered for mission ID 37566072
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 } ] }";
+            events = JournalMonitor.ParseJournalEntry(line);
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
 
             cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "StructuralRegulators");
             Assert.IsNull(cargo);
@@ -337,12 +232,20 @@ namespace UnitTests
             line = @"{ ""timestamp"": ""2018-05-05T19:42:20Z"", ""event"": ""MissionAccepted"", ""Faction"": ""Elite Knights"", ""Name"": ""Mission_Salvage_Planet"", ""LocalisedName"": ""Salvage 3 Structural Regulators"", ""Commodity"": ""$StructuralRegulators_Name;"", ""Commodity_Localised"": ""Structural Regulators"", ""Count"": 3, ""DestinationSystem"": ""Merope"", ""Expiry"": ""2018-05-12T15:20:27Z"", ""Wing"": false, ""Influence"": ""Med"", ""Reputation"": ""Med"", ""Reward"": 557296, ""MissionID"": 375682327 }";
             events = JournalMonitor.ParseJournalEntry(line);
             privateObject.Invoke("_handleMissionAcceptedEvent", new object[] { events[0] });
-            line = @"{""timestamp"":""2018-05-05T19:42:20Z"",""event"":""CollectCargo"",""Type"":""$StructuralRegulators_Name;"",""Stolen"":false}";
+
+            // CargoEvent - Collected 1 Structural Regulators for mission ID 375682327
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"structuralregulators\", \"MissionID\":375682327, \"Count\":1, \"Stolen\":0 } ] }";
             events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCommodityCollectedEvent", new object[] { events[0] });
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
+
             line = @"{ ""timestamp"":""2018-05-05T19:42:20Z"", ""event"":""MissionFailed"", ""Name"":""Mission_Salvage_Planet"", ""MissionID"":375682327 }";
             events = JournalMonitor.ParseJournalEntry(line);
             privateObject.Invoke("_handleMissionFailedEvent", new object[] { events[0] });
+
+            // CargoEvent - 1 Structural Regulators now 'stolen'
+            line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"structuralregulators\", \"Count\":1, \"Stolen\":1 } ] }";
+            events = JournalMonitor.ParseJournalEntry(line);
+            privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });
 
             cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "StructuralRegulators");
             Assert.AreEqual(1, cargo.total);
@@ -402,33 +305,6 @@ namespace UnitTests
             Assert.AreEqual(0, cargo.need);
             Assert.AreEqual(0, haulage.remaining);
         }
-
-        [TestMethod]
-        public void TestCargoSearchAndRescue()
-        {
-            cargoMonitor.initializeCargoMonitor(new CargoMonitorConfiguration());
-            var privateObject = new PrivateObject(cargoMonitor);
-
-            line = @"{""timestamp"": ""2018-05-05T19:12:10Z"", ""event"": ""Cargo"", ""Inventory"": [ { ""Name"": ""damagedescapepod"", ""Name_Localised"": ""Damaged Escape Pod"", ""Count"": 4, ""Stolen"": 0 }, { ""Name"": ""usscargoblackbox"", ""Name_Localised"": ""Black Box"", ""Count"": 4, ""Stolen"": 4 }, { ""Name"": ""drones"", ""Name_Localised"": ""Limpet"", ""Count"": 21, ""Stolen"": 0 } ] }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleCargoInventoryEvent", new object[] { events[0] });
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "DamagedEscapePod");
-            Assert.AreEqual(4, cargo.total);
-            Assert.AreEqual(4, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-
-            // CargoSearchAndRescueEvent
-            line = @"{ ""timestamp"":""2017-08-26T01:58:24Z"", ""event"":""SearchAndRescue"", ""Name"":""damagedescapepod"", ""Count"":2, ""Reward"":5310, ""MarketID"":128666762 }";
-            events = JournalMonitor.ParseJournalEntry(line);
-            privateObject.Invoke("_handleSearchAndRescueEvent", new object[] { events[0] });
-
-            cargo = cargoMonitor.inventory.ToList().FirstOrDefault(c => c.edname == "DamagedEscapePod");
-            Assert.AreEqual(2, cargo.total);
-            Assert.AreEqual(2, cargo.owned);
-            Assert.AreEqual(0, cargo.need + cargo.stolen + cargo.haulage);
-        }
-
 
         [TestMethod]
         public void TestCargoSynthesis()
