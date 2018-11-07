@@ -217,53 +217,56 @@ namespace EddiCargoMonitor
         private bool _handleCargoEvent(CargoEvent @event)
         {
             bool update = false;
-            cargoCarried = @event.cargocarried;
-            if (@event.inventory != null)
+            if (EDDI.Instance?.Vehicle == Constants.VEHICLE_SHIP)
             {
-                List<CargoInfo> infoList = @event.inventory.ToList();
-
-                // Remove strays from the manifest
-                foreach (Cargo inventoryCargo in inventory.ToList())
+                cargoCarried = @event.cargocarried;
+                if (@event.inventory != null)
                 {
-                    CargoInfo info = @event.inventory.FirstOrDefault(i => i.name == inventoryCargo.edname.ToLowerInvariant());
-                    if (info == null)
+                    List<CargoInfo> infoList = @event.inventory.ToList();
+
+                    // Remove strays from the manifest
+                    foreach (Cargo inventoryCargo in inventory.ToList())
                     {
-                        if (inventoryCargo.haulageData == null || !inventoryCargo.haulageData.Any())
+                        CargoInfo info = @event.inventory.FirstOrDefault(i => i.name == inventoryCargo.edname.ToLowerInvariant());
+                        if (info == null)
                         {
-                            // Strip out the stray from the manifest
-                            _RemoveCargoWithEDName(inventoryCargo.edname);
+                            if (inventoryCargo.haulageData == null || !inventoryCargo.haulageData.Any())
+                            {
+                                // Strip out the stray from the manifest
+                                _RemoveCargoWithEDName(inventoryCargo.edname);
+                            }
+                            else
+                            {
+                                // Keep cargo entry in manifest with zeroed amounts, if missions are pending
+                                inventoryCargo.total = 0;
+                                inventoryCargo.haulage = 0;
+                                inventoryCargo.owned = 0;
+                                inventoryCargo.stolen = 0;
+                                inventoryCargo.CalculateNeed();
+                            }
+                            update = true;
                         }
+                    }
+
+                    // Update the manifest from the event. Add cargo which is missing.
+                    while (infoList.Count() > 0)
+                    {
+                        CargoInfo info = infoList.First();
+                        Cargo cargo = inventory.FirstOrDefault(c => c.edname.ToLowerInvariant() == info.name);
+                        if (cargo != null)
+                        {
+                            update = UpdateCargoFromInfo(cargo, infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList());
+                        }
+
+                        // Cargo not in manifest
                         else
                         {
-                            // Keep cargo entry in manifest with zeroed amounts, if missions are pending
-                            inventoryCargo.total = 0;
-                            inventoryCargo.haulage = 0;
-                            inventoryCargo.owned = 0;
-                            inventoryCargo.stolen = 0;
-                            inventoryCargo.CalculateNeed();
+                            cargo = new Cargo(info.name, 0);
+                            update = UpdateCargoFromInfo(cargo, infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList());
+                            AddCargo(cargo);
                         }
-                        update = true;
+                        infoList.RemoveAll(i => i.name == cargo.edname.ToLowerInvariant());
                     }
-                }
-
-                // Update the manifest from the event. Add cargo which is missing.
-                while (infoList.Count() > 0)
-                {
-                    CargoInfo info = infoList.First();
-                    Cargo cargo = inventory.FirstOrDefault(c => c.edname.ToLowerInvariant() == info.name);
-                    if (cargo != null)
-                    {
-                        update = UpdateCargoFromInfo(cargo, infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList());
-                    }
-
-                    // Cargo not in manifest
-                    else
-                    {
-                        cargo = new Cargo(info.name, 0);
-                        update = UpdateCargoFromInfo(cargo, infoList.Where(i => i.name == cargo.edname.ToLowerInvariant()).ToList());
-                        AddCargo(cargo);
-                    }
-                    infoList.RemoveAll(i => i.name == cargo.edname.ToLowerInvariant());
                 }
             }
             return update;
@@ -280,10 +283,27 @@ namespace EddiCargoMonitor
         private bool _handleCommodityCollectedEvent(CommodityCollectedEvent @event)
         {
             bool update = false;
-            Cargo cargo = new Cargo();
-            cargo = GetCargoWithEDName(@event.commodityDefinition?.edname);
+            Cargo cargo = GetCargoWithEDName(@event.commodityDefinition?.edname);
             if (cargo != null)
             {
+                if (EDDI.Instance?.Vehicle != Constants.VEHICLE_SHIP)
+                {
+                    if (@event.missionid != null)
+                    {
+                        cargo.haulage++;
+                    }
+                    else if (@event.stolen)
+                    {
+                        cargo.stolen++;
+                    }
+                    else
+                    {
+                        cargo.owned++;
+                    }
+                    cargo.CalculateNeed();
+                    update = true;
+                }
+
                 Haulage haulage = cargo.haulageData.FirstOrDefault(h => h.missionid == @event.missionid);
                 if (haulage != null)
                 {
@@ -319,6 +339,20 @@ namespace EddiCargoMonitor
             Cargo cargo = GetCargoWithEDName(@event.commodityDefinition?.edname);
             if (cargo != null)
             {
+                if (EDDI.Instance?.Vehicle != Constants.VEHICLE_SHIP)
+                {
+                    if (@event.missionid != null)
+                    {
+                        cargo.haulage -= @event.amount;
+                    }
+                    else
+                    {
+                        cargo.owned -= @event.amount;
+                    }
+                    cargo.CalculateNeed();
+                    update = true;
+                }
+
                 Haulage haulage = cargo.haulageData.FirstOrDefault(h => h.missionid == @event.missionid);
                 if (haulage != null)
                 {
