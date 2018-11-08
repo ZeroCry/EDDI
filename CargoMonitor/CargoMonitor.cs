@@ -217,7 +217,7 @@ namespace EddiCargoMonitor
         private bool _handleCargoEvent(CargoEvent @event)
         {
             bool update = false;
-            if (EDDI.Instance?.Vehicle == Constants.VEHICLE_SHIP)
+            if (@event.vehicle == Constants.VEHICLE_SHIP)
             {
                 cargoCarried = @event.cargocarried;
                 if (@event.inventory != null)

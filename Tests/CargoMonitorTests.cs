@@ -122,6 +122,9 @@ namespace UnitTests
             Haulage haulage = new Haulage();
 
             // CargoEvent
+            line = "{ \"timestamp\":\"2018-10-31T01:54:40Z\", \"event\":\"Missions\", \"Active\":[  ], \"Failed\":[  ], \"Complete\":[  ] }";
+            events = JournalMonitor.ParseJournalEntry(line);
+            privateObject.Invoke("_handleMissionsEvent", new object[] { events[0] });
             line = "{ \"timestamp\":\"2018-10-31T03:39:10Z\", \"event\":\"Cargo\", \"Count\":32, \"Inventory\":[ { \"Name\":\"hydrogenfuel\", \"Name_Localised\":\"Hydrogen Fuel\", \"Count\":1, \"Stolen\":0 }, { \"Name\":\"biowaste\", \"MissionID\":426282789, \"Count\":30, \"Stolen\":0 }, { \"Name\":\"animalmeat\", \"Name_Localised\":\"Animal Meat\", \"Count\":1, \"Stolen\":0 } ] }";
             events = JournalMonitor.ParseJournalEntry(line);
             privateObject.Invoke("_handleCargoEvent", new object[] { events[0] });

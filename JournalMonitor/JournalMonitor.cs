@@ -2761,6 +2761,7 @@ namespace EddiJournalMonitor
                             {
                                 List<CargoInfo> inventory = new List<CargoInfo>();
 
+                                string vehicle = EDDI.Instance?.Vehicle;
                                 int cargocarried = JsonParsing.getInt(data, "Count");
                                 data.TryGetValue("Inventory", out object val);
                                 if (val != null)
@@ -2780,7 +2781,7 @@ namespace EddiJournalMonitor
                                 {
                                     inventory = CargoInfoReader.FromFile().Inventory;
                                 }
-                                events.Add(new CargoEvent(timestamp, inventory, cargocarried) { raw = line });
+                                events.Add(new CargoEvent(timestamp, vehicle, inventory, cargocarried) { raw = line });
                             }
                             handled = true;
                             break;
